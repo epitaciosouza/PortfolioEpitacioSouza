@@ -217,6 +217,7 @@ function executionYear(project){
 function reconciledProjects(projects){
  const groups=new Map();
  for(const p of projects){
+  if(p.imported?.sourceTab==='OCYAN'||p.sourceKey?.startsWith('OCYAN:'))continue;
   const unit=platformCode(p.unit),tag=norm(p.tag).replace(/ /g,''),order=String(p.imported?.order||'').trim();
   if(!unit||!tag||!/^\d{10}$/.test(order))continue;
   const key=unit+'|'+tag+'|'+order;
@@ -774,4 +775,4 @@ $('profileImageFile').onchange=async event=>{
  }catch(err){alert('Não foi possível salvar a foto: '+(err.message||'verifique a imagem e a conexão.'))}
 };
 window.portfolioApplyCloud=records=>{data=records.filter(p=>!p.example).map(p=>p.imported?.sourceTab&&typeof p.imported.maturity==='string'?{...p,status:contractorStatus(p.imported.maturity)}:p);render()};
-</script><script type="module" src="./firebase-portfolio.js"></script></body></html>
+</script><script type="module" src="./firebase-portfolio.js?v=12028a"></script></body></html>
