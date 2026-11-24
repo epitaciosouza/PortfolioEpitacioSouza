@@ -47,7 +47,7 @@ form.addEventListener('submit', async event => {
 });
 logout.addEventListener('click', () => signOut(auth));
 window.portfolioCloudVersion = () => cloudPayload;
-window.portfolioCloudSave = async (records, expectedPayload) => {
+window.portfolioCloudSave = async (records, expectedPayload, options = {}) => {
   if (!auth.currentUser || auth.currentUser.uid !== ADMIN_UID) throw new Error('Apenas o administrador pode alterar os dados.');
   const payload = JSON.stringify(records);
   if (new TextEncoder().encode(payload).length > 950000) throw new Error('A planilha excede o limite de armazenamento desta versão.');
@@ -57,7 +57,9 @@ window.portfolioCloudSave = async (records, expectedPayload) => {
     if (currentPayload !== expectedPayload) throw new Error('Os dados na nuvem foram alterados durante a importação. Recarregue e tente novamente.');
     const photo = current.exists() ? (current.data().fotoPerfil || '') : '';
     if (new TextEncoder().encode(payload).length + new TextEncoder().encode(photo).length > 950000) throw new Error('Os dados e a foto excedem o limite de armazenamento desta versão.');
-    transaction.set(portfolio, { payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+    const changes = { payload };
+    if (options.updateUploadTime !== false) changes.atualizadoEm = new Date().toISOString();
+    transaction.set(portfolio, changes, { merge: true });
   });
 };
 window.portfolioSavePhoto = async (photo, onlyIfMissing = false) => {
