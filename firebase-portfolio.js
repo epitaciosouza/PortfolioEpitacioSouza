@@ -32,6 +32,7 @@ function lock(message = '') {
   cloudPayload = null;
   window.portfolioApplyCloud([]);
   window.portfolioApplyPhoto(null);
+  window.portfolioApplyUpdatedAt(null);
   error.textContent = message;
 }
 form.addEventListener('submit', async event => {
@@ -85,6 +86,7 @@ onAuthStateChanged(auth, async user => {
     window.portfolioIsAdmin = user.uid === ADMIN_UID;
     window.portfolioApplyCloud(records);
     window.portfolioApplyPhoto(snapshot.exists() ? snapshot.data().fotoPerfil : null);
+    window.portfolioApplyUpdatedAt(snapshot.exists() ? snapshot.data().atualizadoEm : null);
     if (window.portfolioIsAdmin && snapshot.exists() && !snapshot.data().fotoPerfil) {
       try {
         const localPhoto = localStorage.getItem('portfolio-profile-photo');
@@ -97,7 +99,7 @@ onAuthStateChanged(auth, async user => {
     document.body.classList.add('signed-in'); gate.hidden = true; logout.hidden = false;
     unsubscribe = onSnapshot(portfolio, next => {
       if (thisGeneration !== generation) return;
-      try { const payload = next.exists() ? next.data().payload : null; const value = next.exists() ? JSON.parse(payload) : []; if (!Array.isArray(value)) throw new Error('Dados inválidos'); cloudPayload = payload; window.portfolioApplyCloud(value); window.portfolioApplyPhoto(next.exists() ? next.data().fotoPerfil : null); }
+      try { const payload = next.exists() ? next.data().payload : null; const value = next.exists() ? JSON.parse(payload) : []; if (!Array.isArray(value)) throw new Error('Dados inválidos'); cloudPayload = payload; window.portfolioApplyCloud(value); window.portfolioApplyPhoto(next.exists() ? next.data().fotoPerfil : null); window.portfolioApplyUpdatedAt(next.exists() ? next.data().atualizadoEm : null); }
       catch { alert('Não foi possível ler os dados atualizados.'); }
     }, () => alert('A conexão com os dados foi interrompida.'));
   } catch {
