@@ -31,6 +31,7 @@ function lock(message = '') {
   window.portfolioIsAdmin = false;
   cloudPayload = null;
   window.portfolioApplyCloud([]);
+  window.portfolioApplyPhoto(null);
   error.textContent = message;
 }
 form.addEventListener('submit', async event => {
@@ -53,7 +54,20 @@ window.portfolioCloudSave = async (records, expectedPayload) => {
     const current = await transaction.get(portfolio);
     const currentPayload = current.exists() ? current.data().payload : null;
     if (currentPayload !== expectedPayload) throw new Error('Os dados na nuvem foram alterados durante a importação. Recarregue e tente novamente.');
-    transaction.set(portfolio, { payload, atualizadoEm: new Date().toISOString() });
+    const photo = current.exists() ? (current.data().fotoPerfil || '') : '';
+    if (new TextEncoder().encode(payload).length + new TextEncoder().encode(photo).length > 950000) throw new Error('Os dados e a foto excedem o limite de armazenamento desta versão.');
+    transaction.set(portfolio, { payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+  });
+};
+window.portfolioSavePhoto = async (photo, onlyIfMissing = false) => {
+  if (!auth.currentUser || auth.currentUser.uid !== ADMIN_UID) throw new Error('Apenas o administrador pode alterar a foto.');
+  await runTransaction(db, async transaction => {
+    const current = await transaction.get(portfolio);
+    if (!current.exists()) throw new Error('Importe os dados do portfólio antes de adicionar a foto.');
+    if (onlyIfMissing && current.data().fotoPerfil) return;
+    const payload = current.data().payload || '';
+    if (new TextEncoder().encode(payload).length + new TextEncoder().encode(photo).length > 950000) throw new Error('Os dados e a foto excedem o limite de armazenamento desta versão.');
+    transaction.update(portfolio, { fotoPerfil: photo });
   });
 };
 onAuthStateChanged(auth, async user => {
@@ -70,12 +84,20 @@ onAuthStateChanged(auth, async user => {
     if (!Array.isArray(records)) throw new Error('Dados inválidos');
     window.portfolioIsAdmin = user.uid === ADMIN_UID;
     window.portfolioApplyCloud(records);
+    window.portfolioApplyPhoto(snapshot.exists() ? snapshot.data().fotoPerfil : null);
+    if (window.portfolioIsAdmin && snapshot.exists() && !snapshot.data().fotoPerfil) {
+      try {
+        const localPhoto = localStorage.getItem('portfolio-profile-photo');
+        if (localPhoto && /^data:image\/jpeg;base64,/.test(localPhoto)) await window.portfolioSavePhoto(localPhoto, true);
+      } catch { console.warn('Não foi possível sincronizar a foto local. Selecione-a novamente.'); }
+      if (thisGeneration !== generation) return;
+    }
     actions.hidden = !window.portfolioIsAdmin;
     document.getElementById('profilePhoto').disabled = !window.portfolioIsAdmin;
     document.body.classList.add('signed-in'); gate.hidden = true; logout.hidden = false;
     unsubscribe = onSnapshot(portfolio, next => {
       if (thisGeneration !== generation) return;
-      try { const payload = next.exists() ? next.data().payload : null; const value = next.exists() ? JSON.parse(payload) : []; if (!Array.isArray(value)) throw new Error('Dados inválidos'); cloudPayload = payload; window.portfolioApplyCloud(value); }
+      try { const payload = next.exists() ? next.data().payload : null; const value = next.exists() ? JSON.parse(payload) : []; if (!Array.isArray(value)) throw new Error('Dados inválidos'); cloudPayload = payload; window.portfolioApplyCloud(value); window.portfolioApplyPhoto(next.exists() ? next.data().fotoPerfil : null); }
       catch { alert('Não foi possível ler os dados atualizados.'); }
     }, () => alert('A conexão com os dados foi interrompida.'));
   } catch {

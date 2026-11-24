@@ -731,32 +731,27 @@ new MutationObserver(()=>requestAnimationFrame(alignProjectColumns)).observe(pro
 window.addEventListener('resize',alignProjectColumns);
 requestAnimationFrame(alignProjectColumns);
 const avatarKey='portfolio-profile-photo';
-function displayProfilePhoto(){
- const photo=localStorage.getItem(avatarKey);
+window.portfolioApplyPhoto=photo=>{
  const avatar=$('profilePhoto');
- if(!photo)return;
- const img=document.createElement('img');
- img.src=photo;
- img.alt='';
- avatar.replaceChildren(img);
-}
-$('profilePhoto').onclick=()=>$('profileImageFile').click();
+ if(!photo){avatar.textContent='ES';return;}
+ const img=document.createElement('img');img.src=photo;img.alt='';avatar.replaceChildren(img);
+};
+$('profilePhoto').onclick=()=>{if(window.portfolioIsAdmin)$('profileImageFile').click()};
 $('profileImageFile').onchange=async event=>{
- const file=event.target.files[0];
- event.target.value='';
- if(!file)return;
+ const file=event.target.files[0];event.target.value='';
+ if(!file||!window.portfolioIsAdmin)return;
  try{
   const bitmap=await createImageBitmap(file);
   try{
-   const canvas=document.createElement('canvas');
-   canvas.width=canvas.height=192;
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=192;
    const side=Math.min(bitmap.width,bitmap.height);
    canvas.getContext('2d').drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,192,192);
-   localStorage.setItem(avatarKey,canvas.toDataURL('image/jpeg',.88));
-   displayProfilePhoto();
+   const photo=canvas.toDataURL('image/jpeg',.88);
+   await window.portfolioSavePhoto(photo);
+   try{localStorage.setItem(avatarKey,photo)}catch{}
+   window.portfolioApplyPhoto(photo);
   }finally{bitmap.close()}
- }catch{alert('Não foi possível salvar a foto. Selecione uma imagem válida e tente novamente.')}
+ }catch(err){alert('Não foi possível salvar a foto: '+(err.message||'verifique a imagem e a conexão.'))}
 };
-displayProfilePhoto();
 window.portfolioApplyCloud=records=>{data=records.filter(p=>!p.example).map(p=>p.imported?.sourceTab&&typeof p.imported.maturity==='string'?{...p,status:contractorStatus(p.imported.maturity)}:p);render()};
 </script><script type="module" src="./firebase-portfolio.js"></script></body></html>
