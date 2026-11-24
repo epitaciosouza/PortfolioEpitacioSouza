@@ -416,7 +416,7 @@ function render(){
  crumbBar.insertBefore(platformGroup,document.querySelector('.global-actions'));
  $('platformQuick').classList.toggle('hide',view==='equipment');
  $('platformQuick').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(quickPlatforms.has(button.dataset.unit))));
- const eligibleProjects=reconciledProjects(data.filter(p=>!p.otherManagement&&!legacyOtherManagement.has(p.sourceKey)));
+ const eligibleProjects=reconciledProjects(data.filter(p=>!p.archivedFromPreviousUpload&&!p.otherManagement&&!legacyOtherManagement.has(p.sourceKey)));
  $('layout').closest('.portfolio-scroll').classList.toggle('projects-view',view==='projects');
  $('layout').closest('.portfolio-scroll').classList.toggle('overview-view',view==='overview');
  const activeProjects=eligibleProjects.filter(p=>(quickPlatforms.size?quickPlatforms:dashboardPlatforms).has(platformCode(p.unit))&&p.imported?.sourceTab!=='OCYAN'&&!p.sourceKey?.startsWith('OCYAN:'));const equipmentList=$('equipmentList');
@@ -564,7 +564,7 @@ $('latest').innerHTML=recentEvents.map(({date,project,text})=>
  '<div class="empty">Nenhum registro neste mês.</div>';
 $('history').innerHTML='<div class="cardhead"><h2>Registros do Portfólio</h2></div>'+(events.map(ev).join('')||'<div class="empty">Nenhum registro.</div>');document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>detail(b.dataset.open));$('history').classList.toggle('hide',view!=='history');$('metrics').classList.toggle('hide',view==='history'||view==='equipment'||view==='backlog'||view==='gduTimeline'||view==='gduGantt');$('portfolioContent').classList.toggle('overview-columns',overview);$('layout').classList.toggle('year-portfolio',overview);$('layout').classList.toggle('hide',view!=='projects'&&!(overview&&yearOpened));updateSortHeaders();}
 function show(html){$('body').innerHTML=html;if(!$('modal').open)$('modal').showModal()}
-function detail(id){const p=reconciledProjects(data).find(x=>x.id===id)||data.find(x=>x.id===id);show('<small>'+esc(p.unit)+' · <span class="tag">'+esc(p.tag)+'</span></small><h2>'+esc(p.name)+'</h2>'+badge(p.status)+importedDetails(p.imported)+'<p><b>Próxima Ação</b><br>'+esc(p.next||'Sem ação registrada')+'</p><p><b>Previsão</b><br>'+fmt(p.due)+'</p><p><b>Restrição ou Pendência</b><br>'+esc(p.restriction||'Sem registro')+'</p><h3>Histórico do Projeto</h3>'+[...p.events].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>'<div class="event">'+fmt(e.date)+' – '+esc(e.text)+'</div>').join(''));}
+function detail(id){const p=reconciledProjects(data.filter(p=>!p.archivedFromPreviousUpload)).find(x=>x.id===id)||data.find(x=>x.id===id);show('<small>'+esc(p.unit)+' · <span class="tag">'+esc(p.tag)+'</span></small><h2>'+esc(p.name)+'</h2>'+badge(p.status)+importedDetails(p.imported)+'<p><b>Próxima Ação</b><br>'+esc(p.next||'Sem ação registrada')+'</p><p><b>Previsão</b><br>'+fmt(p.due)+'</p><p><b>Restrição ou Pendência</b><br>'+esc(p.restriction||'Sem registro')+'</p><h3>Histórico do Projeto</h3>'+[...p.events].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>'<div class="event">'+fmt(e.date)+' – '+esc(e.text)+'</div>').join(''));}
 function backupTimestamp(){
  const fields=new Intl.DateTimeFormat('en-CA',{
   timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit',
@@ -684,33 +684,42 @@ async function chooseWorkbook(file) {
    }
   }
   if (!incoming.size&&!otherManagement.size) throw Error('Nenhuma atividade elegível para Epitácio foi encontrada.');
-  const next=structuredClone(data.filter(p=>!p.example));
-  const existing=new Map(next.filter(p=>p.sourceKey).map(p=>[p.sourceKey,p]));
-  for(const identity of otherManagement){const project=existing.get(identity);if(project)project.otherManagement=true;}
-  let added=0,updated=0,portfolioOnly=0;
-  for (const [sourceKey,{v,status,tab,outsideManagement}] of incoming) {
+  const previous=structuredClone(data.filter(p=>!p.example));
+  const next=[], used=new Set();
+  const exact=new Map(), byRef=new Map(), incomingRef=new Map();
+  const refKey=p=>{
+   const unit=platformCode(p.unit),tag=norm(p.tag).replace(/ /g,''),om=String(p.imported?.order||'').trim();
+   return unit&&tag&&/^\d{10}$/.test(om)?unit+'|'+tag+'|'+om:'';
+  };
+  const add=(map,key,value)=>{if(!key)return;if(!map.has(key))map.set(key,[]);map.get(key).push(value)};
+  for(const p of previous){add(exact,p.sourceKey,p);if(p.imported?.sourceTab!=='OCYAN')add(byRef,refKey(p),p)}
+  for(const [key,item] of incoming){if(item.tab!=='OCYAN')add(incomingRef,refKey({unit:item.v.unit,tag:item.v.tag,imported:{order:item.v.order}}),key)}
+  let added=0,updated=0,portfolioOnly=0,unchanged=0;
+  for(const [sourceKey,{v,status,tab,outsideManagement}] of incoming){
    if(tab==='OCYAN'||outsideManagement)portfolioOnly++;
-   let p=existing.get(sourceKey);
-   if(p&&outsideManagement)p.otherManagement=true;
-   else if(p)delete p.otherManagement;
-   if (p&&p.status===status&&JSON.stringify(p.imported)===JSON.stringify(v)) continue;
-   if (!p) {
-    p={id:crypto.randomUUID(),sourceKey,otherManagement:outsideManagement,next:'',due:'',restriction:'',events:[]};
-    next.push(p);if(tab!=='OCYAN'&&!outsideManagement)added++;
-    p.events.push({date:(status===2&&v.end)||today(),text:'Registro importado da aba '+tab+'.'});
-   } else {
-    if(tab!=='OCYAN'&&!outsideManagement)updated++;
-    const updateText='Registro atualizado pela aba '+tab+'.';
-    if(!p.events.some(event=>event.date===today()&&event.text===updateText)){
-     p.events.unshift({date:today(),text:updateText});
-    }
+   let candidates=(exact.get(sourceKey)||[]).filter(p=>!used.has(p));
+   let p=candidates.length===1?candidates[0]:null;
+   if(!p&&tab!=='OCYAN'){
+    const ref=refKey({unit:v.unit,tag:v.tag,imported:{order:v.order}});
+    candidates=(byRef.get(ref)||[]).filter(x=>!used.has(x));
+    if(ref&&candidates.length===1&&(incomingRef.get(ref)||[]).length===1)p=candidates[0];
    }
-   Object.assign(p,{name:v.scope||v.equipment||v.tag||v.order,tag:v.tag,unit:v.unit,status,imported:v});
+   const old=p;
+   if(p){used.add(p);p={...p};delete p.archivedFromPreviousUpload;}
+   else p={id:crypto.randomUUID(),next:'',due:'',restriction:'',events:[]};
+   const changed=!old||old.status!==status||JSON.stringify(old.imported)!==JSON.stringify(v);
+   if(tab!=='OCYAN'&&!outsideManagement){if(!old)added++;else if(changed)updated++;else unchanged++;}
+   if(!old)p.events=[{date:(status===2&&v.end)||today(),text:'Registro importado da aba '+tab+'.'}];
+   else if(changed){const updateText='Registro atualizado pela aba '+tab+'.';p.events=Array.isArray(p.events)?p.events:[];if(!p.events.some(e=>e.date===today()&&e.text===updateText))p.events.unshift({date:today(),text:updateText});}
+   Object.assign(p,{sourceKey,otherManagement:outsideManagement,name:v.scope||v.equipment||v.tag||v.order,tag:v.tag,unit:v.unit,status,imported:v});
+   next.push(p);
   }
+  // Preserve older records and history for recovery, but never include them in current dashboards.
+  for(const p of previous)if(!used.has(p))next.push({...p,archivedFromPreviousUpload:true});
   await window.portfolioCloudSave(next, cloudVersion);
   data=next;
   $('query').value='';$('platform').value='';$('stage').value='';nav('projects');
-  show('<h2>Importação Concluída</h2><p>'+counts[2]+' concluídas · '+counts[1]+' em execução · '+counts[3]+' paralisadas · '+counts[0]+' em planejamento · '+counts[4]+' a planejar</p><p>'+added+' novas · '+updated+' atualizadas · '+(incoming.size-portfolioOnly-added-updated)+' já cadastradas</p>'+
+  show('<h2>Importação Concluída</h2><p>'+counts[2]+' concluídas · '+counts[1]+' em execução · '+counts[3]+' paralisadas · '+counts[0]+' em planejamento · '+counts[4]+' a planejar</p><p>'+added+' novas · '+updated+' atualizadas · '+unchanged+' já cadastradas</p>'+
    (portfolioOnly?'<p>'+portfolioOnly+' registro(s) da OCYAN para consulta em Equipamentos.</p>':'')+
    (otherManagement.size?'<p>'+otherManagement.size+' concluído(s) de outra gerência desconsiderado(s).</p>':'')+
    (duplicates?'<p>'+duplicates+' linha(s) com a mesma identificação foram contabilizadas uma vez.</p>':'')+
