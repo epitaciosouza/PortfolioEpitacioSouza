@@ -397,9 +397,9 @@ function renderGdu(projects){
    content='<div class="gdu-gantt"><div class="gdu-axis"><span>Plataforma / TAG</span><div class="gdu-years">'+ticks+'</div></div>'+lanes.map(({unit,suffix,matches,pending})=>{
     const marks=matches.map(({p,v,days},index)=>{
      const left=(Date.parse(v.start)-min)/span*100;
-     const width=(Date.parse(v.end)-Date.parse(v.start)+86400000)/span*100;
+     
      const title=fmt(v.start)+' a '+fmt(v.end)+' · '+days+(days===1?' dia':' dias');
-     return '<button class="gdu-mark" data-open="'+esc(p.id)+'" type="button" style="top:'+(index*18)+'px;left:'+left+'%;width:'+width+'%" aria-label="'+esc(p.unit+' '+p.tag+' · '+title)+'"><span class="gdu-bar"></span><span class="gdu-tooltip"><b>Período</b><br>'+esc(fmt(v.start))+' a '+esc(fmt(v.end))+'<br>'+days+(days===1?' dia':' dias')+'</span></button>';
+     return '<button class="gdu-mark" data-open="'+esc(p.id)+'" type="button" style="top:'+(index*18)+'px;left:'+left+'%;width:46px" aria-label="'+esc(p.unit+' '+p.tag+' · '+title)+'"><span class="gdu-bar"></span><span class="gdu-tooltip"><b>Período</b><br>'+esc(fmt(v.start))+' a '+esc(fmt(v.end))+'<br>'+days+(days===1?' dia':' dias')+'</span></button>';
     }).join('');
     const note=pending.length?'Datas pendentes':matches.length?'':'Sem registro';
     return '<div class="gdu-gantt-row"><span><b>'+esc(unit.replace('P','P-'))+'</b><small class="tag">FT-UT-1233001-03'+suffix+'</small></span><span class="gdu-track" style="height:'+Math.max(18,matches.length*18)+'px">'+marks+(note?'<span class="gdu-lane-note">'+note+'</span>':'')+'</span></div>';
