@@ -216,24 +216,18 @@ function executionYear(project){
  return '';
 }
 function reconciledProjects(projects){
- const groups=new Map();
+ const selected=new Map(), hidden=new Set();
+ const priority={1:0,3:1,0:2,4:3};
  for(const p of projects){
-  if(p.imported?.sourceTab==='OCYAN'||p.sourceKey?.startsWith('OCYAN:'))continue;
-  const unit=platformCode(p.unit),tag=norm(p.tag).replace(/ /g,''),order=String(p.imported?.order||'').trim();
-  if(!unit||!tag||!/^\d{10}$/.test(order))continue;
-  const key=unit+'|'+tag+'|'+order;
-  if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);
+  if(p.status===2||p.imported?.sourceTab==='OCYAN'||p.sourceKey?.startsWith('OCYAN:'))continue;
+  const unit=platformCode(p.unit),tag=norm(p.tag).replace(/ /g,'');
+  if(!unit||!tag)continue;
+  const key=unit+'|'+tag, previous=selected.get(key);
+  if(!previous){selected.set(key,p);continue;}
+  if((priority[p.status]??99)<(priority[previous.status]??99)){hidden.add(previous);selected.set(key,p)}
+  else hidden.add(p);
  }
- const hidden=new Set(), replacements=new Map();
- for(const group of groups.values()){
-  const done=group.filter(p=>p.status===2&&p.imported&&!p.imported.sourceTab);
-  const open=group.filter(p=>p.status!==2&&p.imported?.sourceTab&&p.imported.sourceTab!=='OCYAN');
-  if(done.length!==1||open.length!==1||group.length!==2)continue;
-  const prior=open[0],current=done[0];hidden.add(prior);
-  const seen=new Set();const events=[...(current.events||[]),...(prior.events||[])].filter(e=>{const k=JSON.stringify([e.date,e.text]);if(seen.has(k))return false;seen.add(k);return true});
-  replacements.set(current,{...current,events,next:current.next||prior.next,due:current.due||prior.due,restriction:current.restriction||prior.restriction});
- }
- return projects.filter(p=>!hidden.has(p)).map(p=>replacements.get(p)||p);
+ return projects.filter(p=>!hidden.has(p));
 }
 window.portfolioApplyUpdatedAt=value=>{const el=$('lastUpload');const date=value?new Date(value):null;if(!date||Number.isNaN(date.getTime())){el.hidden=true;el.textContent='';return;}el.textContent='Último Upload em '+new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date).replace(',',' ,').replace(' ,',',');el.hidden=false};
 function nav(v){if(v==='overview'){quickPlatforms.clear();selectedEquipmentType='';}view=v;document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===v));$('breadcrumb').textContent={overview:'Visão Geral',projects:'Projetos',history:'Histórico',equipment:'Equipamentos',backlog:'Backlog',gduTimeline:'GDU · Linha do Tempo',gduGantt:'Trocas de Filtros GDU'}[v];$('heading').textContent={overview:'Projetos de Construção e Montagem',projects:'Projetos de Construção e Montagem',history:'Histórico de intervenções',equipment:'Equipamentos',backlog:'Backlog',gduTimeline:'Trocas de Filtros GDU',gduGantt:'Trocas de Filtros GDU'}[v];$('subtitle').textContent={overview:'Acompanhe os projetos, as intervenções em andamento e as próximas entregas.',projects:'Consulte o escopo, as restrições e as previsões de cada projeto.',history:'Consulte os registros dos projetos em ordem cronológica.',equipment:'Carteira Unificada de Equipamentos',gduTimeline:'Histórico das Trocas Concluídas nas Plataformas P-66, P-67 e P-69.',gduGantt:'Períodos de Execução das Trocas Concluídas.',backlog:'Pendências de Encerramento de SS e OM nas Atividades Concluídas.'}[v];render()}
