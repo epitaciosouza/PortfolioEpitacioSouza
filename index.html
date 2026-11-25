@@ -557,7 +557,8 @@ $('latest').innerHTML=recentEvents.map(({date,project,text})=>
  '<div class="recent-comment">'+esc(text||'—')+'</div></div>').join('')||
  '<div class="empty">Nenhum registro neste mês.</div>';
 $('history').innerHTML='<div class="cardhead"><h2>Registros do Portfólio</h2></div>'+(events.map(ev).join('')||'<div class="empty">Nenhum registro.</div>');document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>detail(b.dataset.open));$('history').classList.toggle('hide',view!=='history');$('metrics').classList.toggle('hide',view==='history'||view==='equipment'||view==='backlog'||view==='gduTimeline'||view==='gduGantt');$('portfolioContent').classList.toggle('overview-columns',overview);$('layout').classList.toggle('year-portfolio',overview);$('layout').classList.toggle('hide',view!=='projects'&&!(overview&&yearOpened));updateSortHeaders();}
-function show(html){$('body').innerHTML=html;if(!$('modal').open)$('modal').showModal()}
+function show(html,closeOutside=false){$('modal').dataset.closeOutside=String(closeOutside);$('body').innerHTML=html;if(!$('modal').open)$('modal').showModal()}
+$('modal').addEventListener('click',event=>{const dialog=$('modal');if(dialog.dataset.closeOutside!=='true'||event.target!==dialog)return;const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close()});
 function detail(id){
  const p=reconciledProjects(data.filter(p=>!p.archivedFromPreviousUpload)).find(x=>x.id===id)||data.find(x=>x.id===id);
  if(!p)return;
@@ -570,7 +571,7 @@ function detail(id){
    fields='<p class="read-field"><b>Próxima Ação</b><br>'+esc(p.next||'Sem ação registrada')+'</p><p><b>Previsão</b><br>'+esc(fmt(p.due))+'</p><p class="read-field"><b>Restrição ou Pendência</b><br>'+esc(p.restriction||'Sem registro')+'</p>';
   }
  }
- show('<small>'+esc(p.unit)+' · <span class="tag">'+esc(p.tag)+'</span></small><h2>'+esc(p.name)+'</h2>'+badge(p.status)+importedDetails(p.imported)+fields);
+ show('<small>'+esc(p.unit)+' · <span class="tag">'+esc(p.tag)+'</span></small><h2>'+esc(p.name)+'</h2>'+badge(p.status)+importedDetails(p.imported)+fields,true);
  const form=$('projectFields');if(!form)return;
  const expected=window.portfolioCloudVersion();
  form.onsubmit=async event=>{
